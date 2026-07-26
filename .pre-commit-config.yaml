@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2026 AlgorIT Software Consultancy
+# SPDX-License-Identifier: BSL-1.0
+# See https://pre-commit.com for more information
+
+# exclude: '^extern/'
+fail_fast: false
+
+ci:
+  autofix_commit_msg: 'ci: pre-commit.ci auto fixes'
+  autoupdate_commit_msg: 'chore(deps): pre-commit.ci autoupdate'
+
+repos:
+  - repo: meta
+    hooks:
+      - id: check-hooks-apply
+      - id: check-useless-excludes
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-json
+      - id: check-toml
+      - id: check-yaml
+      - id: check-added-large-files
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.49.1
+    hooks:
+      - id: markdownlint
+        args: ['--disable', 'MD013']
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.8
+    hooks:
+    - id: clang-format
+      types_or: [c++, c]
+
+  - repo: https://github.com/BlankSpruce/gersemi-pre-commit
+    rev: 0.28.0
+    hooks:
+      - id: gersemi
+        exclude: '(\.in$)|(get_cpm.cmake)'
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.3
+    hooks:
+      - id: codespell
+
+  - repo: https://github.com/maxwinterstein/shfmt-py
+    rev: v4.0.0
+    hooks:
+      - id: shfmt
+        args: ["-w", "-i", "4"]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/fsfe/reuse-tool
+    rev: v6.2.0
+    hooks:
+      - id: reuse

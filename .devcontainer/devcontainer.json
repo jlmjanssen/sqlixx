@@ -1,0 +1,20 @@
+{
+  "name": "Beman Project Clang",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "remoteUser": "developer",
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/developer/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}/.gitconfig.d,target=/home/developer/.gitconfig.d,type=bind,consistency=cached"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools"
+      ]
+    }
+  }
+}

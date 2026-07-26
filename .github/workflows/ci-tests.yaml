@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: 2026 AlgorIT Software Consultancy
+# SPDX-License-Identifier: BSL-1.0
+
+name: CI Tests
+
+on:
+  push:
+    branches: [main, develop]
+
+jobs:
+  build-gcc-debug:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-gcc:16
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --workflow --preset=gcc-debug
+
+  build-gcc-release:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-gcc:16
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --workflow --preset=gcc-release
+
+  build-llvm-debug:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-clang:22
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --workflow --preset=llvm-debug
+
+  build-llvm-release:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-clang:22
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --workflow --preset=llvm-release
+
+  coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-clang:22
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --workflow --preset=llvm-coverage
+      - uses: codecov/codecov-action@v7
+        with:
+          files: ./build/llvm-coverage/coverage.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+      - run: |
+          (
+            printf '### 📊 Code Coverage Summary\n\n```text\n'
+            cmake/collect-llvm-data.sh summary
+            printf '```\n'
+          ) >>$GITHUB_STEP_SUMMARY
+
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/bemanproject/infra-containers-clang:22
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --workflow --preset=llvm-lint

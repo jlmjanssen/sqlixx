@@ -1,0 +1,375 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "_root-config",
+      "hidden": true,
+      "warnings": {
+        "dev": false
+      },
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/stage",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CPM_SOURCE_CACHE": "${sourceDir}/.cache"
+      }
+    },
+    {
+      "name": "_sqlite-config",
+      "hidden": true,
+      "cacheVariables": {
+        "SQLITE_DQS": "0",
+        "SQLITE_ENABLE_API_ARMOR": "ON",
+        "SQLITE_ENABLE_COLUMN_METADATA": "ON",
+        "SQLITE_OMIT_DEPRECATED": "ON"
+      }
+    },
+    {
+      "name": "_debug-base",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "SQLIXX_BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "_release-base",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "gcc-debug",
+      "displayName": "GCC Debug Build",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_debug-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-gcc.cmake",
+        "ENABLE_SANITIZER": "MaxSan"
+      }
+    },
+    {
+      "name": "gcc-release",
+      "displayName": "GCC Release Build",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_release-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-gcc.cmake"
+      }
+    },
+    {
+      "name": "gcc-coverage",
+      "displayName": "GCC Coverage Build",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_debug-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-gcc.cmake",
+        "ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "llvm-debug",
+      "displayName": "Clang Debug Build",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_debug-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-llvm.cmake",
+        "ENABLE_SANITIZER": "MaxSan"
+      }
+    },
+    {
+      "name": "llvm-release",
+      "displayName": "Clang Release Build",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_release-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-llvm.cmake"
+      }
+    },
+    {
+      "name": "llvm-lint",
+      "displayName": "Clang Static Analysis",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_debug-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-llvm.cmake",
+        "ENABLE_CLANG_TIDY": "ON",
+        "SQLIXX_BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "llvm-coverage",
+      "displayName": "Clang Coverage Build",
+      "inherits": [
+        "_root-config",
+        "_sqlite-config",
+        "_debug-base"
+      ],
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-llvm.cmake",
+        "ENABLE_COVERAGE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "_root-build",
+      "hidden": true,
+      "jobs": 0,
+      "targets": "all"
+    },
+    {
+      "name": "gcc-debug",
+      "configurePreset": "gcc-debug",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "gcc-release",
+      "configurePreset": "gcc-release",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "gcc-coverage",
+      "configurePreset": "gcc-coverage",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "gcc-coverage-collect",
+      "configurePreset": "gcc-coverage",
+      "inherits": "_root-build",
+      "targets": "coverage-data"
+    },
+    {
+      "name": "gcc-coverage-summary",
+      "configurePreset": "gcc-coverage",
+      "inherits": "_root-build",
+      "targets": "coverage-summary"
+    },
+    {
+      "name": "llvm-debug",
+      "configurePreset": "llvm-debug",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "llvm-release",
+      "configurePreset": "llvm-release",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "llvm-lint",
+      "configurePreset": "llvm-lint",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "llvm-coverage",
+      "configurePreset": "llvm-coverage",
+      "inherits": "_root-build"
+    },
+    {
+      "name": "llvm-coverage-collect",
+      "configurePreset": "llvm-coverage",
+      "inherits": "_root-build",
+      "targets": "coverage-data"
+    },
+    {
+      "name": "llvm-coverage-summary",
+      "configurePreset": "llvm-coverage",
+      "inherits": "_root-build",
+      "targets": "coverage-summary"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "_root-test",
+      "hidden": true,
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-debug",
+      "configurePreset": "gcc-debug",
+      "inherits": "_root-test"
+    },
+    {
+      "name": "gcc-release",
+      "configurePreset": "gcc-release",
+      "inherits": "_root-test"
+    },
+    {
+      "name": "gcc-coverage",
+      "configurePreset": "gcc-coverage",
+      "inherits": "_root-test"
+    },
+    {
+      "name": "llvm-debug",
+      "configurePreset": "llvm-debug",
+      "inherits": "_root-test"
+    },
+    {
+      "name": "llvm-release",
+      "configurePreset": "llvm-release",
+      "inherits": "_root-test"
+    },
+    {
+      "name": "llvm-coverage",
+      "configurePreset": "llvm-coverage",
+      "inherits": "_root-test",
+      "environment": {
+        "LLVM_PROFILE_FILE": "%b-%p.profraw"
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "gcc-debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "gcc-debug"
+        },
+        {
+          "type": "build",
+          "name": "gcc-debug"
+        },
+        {
+          "type": "test",
+          "name": "gcc-debug"
+        }
+      ]
+    },
+    {
+      "name": "gcc-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "gcc-release"
+        },
+        {
+          "type": "build",
+          "name": "gcc-release"
+        },
+        {
+          "type": "test",
+          "name": "gcc-release"
+        }
+      ]
+    },
+    {
+      "name": "gcc-coverage",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "gcc-coverage"
+        },
+        {
+          "type": "build",
+          "name": "gcc-coverage"
+        },
+        {
+          "type": "test",
+          "name": "gcc-coverage"
+        },
+        {
+          "type": "build",
+          "name": "gcc-coverage-collect"
+        }
+      ]
+    },
+    {
+      "name": "llvm-debug",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "llvm-debug"
+        },
+        {
+          "type": "build",
+          "name": "llvm-debug"
+        },
+        {
+          "type": "test",
+          "name": "llvm-debug"
+        }
+      ]
+    },
+    {
+      "name": "llvm-release",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "llvm-release"
+        },
+        {
+          "type": "build",
+          "name": "llvm-release"
+        },
+        {
+          "type": "test",
+          "name": "llvm-release"
+        }
+      ]
+    },
+    {
+      "name": "llvm-lint",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "llvm-lint"
+        },
+        {
+          "type": "build",
+          "name": "llvm-lint"
+        }
+      ]
+    },
+    {
+      "name": "llvm-coverage",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "llvm-coverage"
+        },
+        {
+          "type": "build",
+          "name": "llvm-coverage"
+        },
+        {
+          "type": "test",
+          "name": "llvm-coverage"
+        },
+        {
+          "type": "build",
+          "name": "llvm-coverage-collect"
+        }
+      ]
+    }
+  ]
+}
