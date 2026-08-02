@@ -10,13 +10,13 @@ target_sources(
         error_test.cpp
         error.sqlite_test.cpp
         connection_test.cpp
-        # connection.open_test.cpp
+        connection.open_test.cpp
         statement_test.cpp
-    # statement.coro_test.cpp
-    # statement.prepare_test.cpp
-    # statement.step_test.cpp
-    # binders_test.cpp
-    # readers_test.cpp
+        statement.coro_test.cpp
+        statement.prepare_test.cpp
+        statement.step_test.cpp
+        binders_test.cpp
+        readers_test.cpp
 )
 target_link_libraries(
     sqlixx.unittest

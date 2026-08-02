@@ -12,20 +12,33 @@ import :readers;
 
 namespace sqlixx {
 
-export using step_error_handler = std::move_only_function<void(std::error_code) noexcept>;
+struct scope_guard {
+    ~scope_guard() noexcept { std::ignore = ::sqlite3_reset(stmt_handle); }
+    ::sqlite3_stmt* stmt_handle;
+};
 
-export [[nodiscard]] auto execute(statement_handle stmt, step_error_handler on_error = nullptr) noexcept
-    -> std::generator<row_context> {
+export [[nodiscard]] auto execute(statement_handle stmt) noexcept
+    -> std::generator<std::expected<row_context, std::error_code>> {
+    scope_guard reset_guard{stmt.get()};
+
     for (;;) {
-        if (auto step_res = sqlixx::step(stmt); !step_res) [[unlikely]] {
-            if (on_error) {
-                std::invoke(on_error, step_res.error());
-            }
+        switch (int result_code = ::sqlite3_step(stmt.get())) {
+        case SQLITE_ROW:
+            co_yield row_context(stmt.get());
+            continue;
+
+        case SQLITE_DONE:
             co_return;
-        } else if (*step_res == row_state::empty) {
+
+        case SQLITE_BUSY:
+        case SQLITE_BUSY_RECOVERY:
+        case SQLITE_LOCKED_SHAREDCACHE:
+            co_yield std::unexpected(make_sqlite_error_code(result_code));
+            continue;
+
+        default:
+            co_yield std::unexpected(make_sqlite_error_code(result_code));
             co_return;
-        } else {
-            co_yield row_context{stmt};
         }
     }
 }

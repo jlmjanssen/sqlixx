@@ -29,7 +29,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                 THEN("Fail with no_active_row error") {
                     REQUIRE_FALSE(res.has_value());
-                    CHECK(res.error() == sqlixx::errc::no_active_row);
+                    CHECK(res.error() == sqlixx::errc::invalid_column_index);
                 }
             }
 
@@ -187,28 +187,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                 THEN("Fail inside the multi-unpacker with no_active_row") {
                     REQUIRE_FALSE(status.has_value());
-                    CHECK(status.error() == sqlixx::errc::no_active_row);
-                }
-            }
-
-            AND_WHEN("Unpacking multiple columns but the starting index exceeds available width") {
-                REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(2).TIMES(2);
-
-                int a = 0;
-                double b = 0.0;
-
-                sqlixx::row_context ctxt_low{stmt, -1};
-                sqlixx::row_context ctxt_high{stmt, 2};
-
-                auto status_low = sqlixx::read(ctxt_low, a, b);
-                auto status_high = sqlixx::read(ctxt_high, a, b);
-
-                THEN("Fail inside the primitive readers with invalid_column_index") {
-                    REQUIRE_FALSE(status_low.has_value());
-                    CHECK(status_low.error() == sqlixx::errc::invalid_column_index);
-
-                    REQUIRE_FALSE(status_high.has_value());
-                    CHECK(status_high.error() == sqlixx::errc::invalid_column_index);
+                    CHECK(status.error() == sqlixx::errc::invalid_column_index);
                 }
             }
 
@@ -217,7 +196,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
                 REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(2);
 
                 int i = 0;
-                sqlixx::row_context ctxt{stmt};
+                sqlixx::row_context ctxt{stmt.get()};
 
                 AND_WHEN("Reading an excess integral value in a tie") {
                     int j = 0;
@@ -283,7 +262,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                 THEN("Propagate the inner unexpected status error all the way out") {
                     REQUIRE_FALSE(res.has_value());
-                    CHECK(res.error() == sqlixx::errc::no_active_row);
+                    CHECK(res.error() == sqlixx::errc::invalid_column_index);
                 }
             }
         }

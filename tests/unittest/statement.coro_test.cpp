@@ -24,6 +24,7 @@ SCENARIO("Verify coroutine-generator execution pipeline", "[statement][coro]") {
             REQUIRE_CALL(mock, sqlite3_step(dummy_stmt)).RETURN(SQLITE_ROW).IN_SEQUENCE(seq);
             REQUIRE_CALL(mock, sqlite3_step(dummy_stmt)).RETURN(SQLITE_ROW).IN_SEQUENCE(seq);
             REQUIRE_CALL(mock, sqlite3_step(dummy_stmt)).RETURN(SQLITE_DONE).IN_SEQUENCE(seq);
+            REQUIRE_CALL(mock, sqlite3_reset(dummy_stmt)).RETURN(SQLITE_OK).IN_SEQUENCE(seq);
 
             REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(1).TIMES(2);
             REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(100);
@@ -34,7 +35,7 @@ SCENARIO("Verify coroutine-generator execution pipeline", "[statement][coro]") {
                 int current_value = 0;
 
                 for (auto row : sqlixx::execute(stmt)) {
-                    auto read_status = sqlixx::read(row, std::tie(current_value));
+                    auto read_status = sqlixx::read(*row, std::tie(current_value));
                     REQUIRE(read_status.has_value());
                     total_sum += current_value;
                 }
@@ -48,6 +49,7 @@ SCENARIO("Verify coroutine-generator execution pipeline", "[statement][coro]") {
 
             REQUIRE_CALL(mock, sqlite3_step(dummy_stmt)).RETURN(SQLITE_ROW).IN_SEQUENCE(seq);
             REQUIRE_CALL(mock, sqlite3_step(dummy_stmt)).RETURN(SQLITE_CORRUPT).IN_SEQUENCE(seq);
+            REQUIRE_CALL(mock, sqlite3_reset(dummy_stmt)).RETURN(SQLITE_OK).IN_SEQUENCE(seq);
 
             REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(1);
             REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(50);
@@ -57,11 +59,14 @@ SCENARIO("Verify coroutine-generator execution pipeline", "[statement][coro]") {
                 int current_value = 0;
                 std::error_code intercepted_error{};
 
-                auto rows = sqlixx::execute(
-                    stmt, [&intercepted_error](std::error_code ec) noexcept { intercepted_error = ec; });
+                auto rows = sqlixx::execute(stmt);
 
                 for (auto row : rows) {
-                    auto read_status = sqlixx::read(row, std::tie(current_value));
+                    if (!row) {
+                        intercepted_error = row.error();
+                        break;
+                    }
+                    auto read_status = sqlixx::read(*row, std::tie(current_value));
                     REQUIRE(read_status.has_value());
                     total_sum += current_value;
                 }
@@ -75,6 +80,7 @@ SCENARIO("Verify coroutine-generator execution pipeline", "[statement][coro]") {
             trompeloeil::sequence seq;
 
             REQUIRE_CALL(mock, sqlite3_step(dummy_stmt)).RETURN(SQLITE_CORRUPT).IN_SEQUENCE(seq);
+            REQUIRE_CALL(mock, sqlite3_reset(dummy_stmt)).RETURN(SQLITE_OK).IN_SEQUENCE(seq);
 
             THEN("Gracefully halt iteration without invoking or crashing on a null callback") {
                 int row_count = 0;
@@ -82,6 +88,8 @@ SCENARIO("Verify coroutine-generator execution pipeline", "[statement][coro]") {
                 auto rows = sqlixx::execute(stmt);
 
                 for (auto row : rows) {
+                    if (!row)
+                        break;
                     std::ignore = row;
                     ++row_count;
                 }
