@@ -3,8 +3,9 @@
 
 #pragma once
 
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/trompeloeil.hpp>
 #include <sqlite3.h>
-#include <trompeloeil.hpp>
 
 class sqlite_mock {
 public:
@@ -33,10 +34,10 @@ public:
     MAKE_MOCK(sqlite3_bind_blob64, auto(sqlite3_stmt*, int, const void*, sqlite3_uint64, void (*)(void*))->int);
     MAKE_MOCK(sqlite3_bind_zeroblob64, auto(sqlite3_stmt*, int, sqlite3_uint64)->int);
     MAKE_MOCK(sqlite3_bind_null, auto(sqlite3_stmt*, int)->int);
+    MAKE_MOCK(sqlite3_bind_parameter_count, auto(sqlite3_stmt*)->int);
     MAKE_MOCK(sqlite3_bind_parameter_index, auto(sqlite3_stmt*, const char*)->int);
 
     MAKE_MOCK(sqlite3_data_count, auto(sqlite3_stmt*)->int);
-    MAKE_MOCK(sqlite3_column_int, auto(sqlite3_stmt*, int)->int);
     MAKE_MOCK(sqlite3_column_int64, auto(sqlite3_stmt*, int)->sqlite3_int64);
     MAKE_MOCK(sqlite3_column_double, auto(sqlite3_stmt*, int)->double);
     MAKE_MOCK(sqlite3_column_text, auto(sqlite3_stmt*, int)->const unsigned char*);

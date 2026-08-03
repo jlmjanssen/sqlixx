@@ -20,7 +20,7 @@ SPDX-License-Identifier: BSL-1.0
 
 ## License
 
-`sqlixx` is released under the [MIT License](LICENSE)
+`sqlixx` is released under the [Boost Software License](LICENSE).
 
 ---
 
@@ -29,16 +29,15 @@ import std;
 import sqlixx;
 
 int main() {
-    if (auto conn = sqlixx::open_connection("file:data.db?mode=ro&cache=private", sqlixx::open::uri)) {
-        if (auto prep = sqlixx::prepare_statement(*conn, "SELECT u.id, u.name FROM users AS u WHERE u.status = ?;")) {
-            if (auto bind_res = sqlixx::bind_parameters(prep->stmt, "active")) {
-                int id;
-                std::string_view name;
-                for (auto row : sqlixx::execute(prep->stmt)) {
-                    if (sqlixx::read_tuple(row, std::tie(id, name))) {
-                        std::println("id = {}, name = {}", id, name);
-                    }
-                }
+    if (auto conn = sqlixx::open_connection("user.db", sqlixx::open::readwrite)) {
+        const auto sql = "SELECT id, name FROM users WHERE status = ?";
+        if (auto prep = sqlixx::prepare_statement(*conn, sql)) {
+            int id;
+            std::string_view name;
+            std::ignore = sqlixx::bind(prep->stmt, "active");
+            for (auto row : sqlixx::execute(prep->stmt)) {
+                std::ignore = sqlixx::read(*row, id, name);
+                std::println("id = {}, name = {}", id, name);
             }
         }
     }

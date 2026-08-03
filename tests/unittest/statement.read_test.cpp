@@ -12,7 +12,7 @@ import sqlixx;
 
 using trompeloeil::_;
 
-SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]") {
+SCENARIO("Verify column and tuple reader mechanics via reader_context", "[readers]") {
     GIVEN("A registered SQLite mock and a statement handle with data") {
         using namespace std::string_view_literals;
         sqlite_mock mock;
@@ -29,7 +29,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                 THEN("Fail with no_active_row error") {
                     REQUIRE_FALSE(res.has_value());
-                    CHECK(res.error() == sqlixx::errc::invalid_column_index);
+                    CHECK(res.error() == sqlixx::errc::invalid_index);
                 }
             }
 
@@ -41,11 +41,11 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
                 auto res_low = sqlixx::read(stmt, -1, val_low);
                 auto res_high = sqlixx::read(stmt, 2, val_high);
 
-                THEN("Fail with invalid_column_index error") {
+                THEN("Fail with invalid_index error") {
                     REQUIRE_FALSE(res_low.has_value());
-                    CHECK(res_low.error() == sqlixx::errc::invalid_column_index);
+                    CHECK(res_low.error() == sqlixx::errc::invalid_index);
                     REQUIRE_FALSE(res_high.has_value());
-                    CHECK(res_high.error() == sqlixx::errc::invalid_column_index);
+                    CHECK(res_high.error() == sqlixx::errc::invalid_index);
                 }
             }
         }
@@ -54,7 +54,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
             REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(5).TIMES(AT_LEAST(1));
 
             AND_WHEN("Reading integral values") {
-                REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(42);
+                REQUIRE_CALL(mock, sqlite3_column_int64(dummy_stmt, 0)).RETURN(42LL);
                 REQUIRE_CALL(mock, sqlite3_column_int64(dummy_stmt, 1)).RETURN(9000000000000LL);
 
                 THEN("Route correctly to the matching C API type size") {
@@ -115,7 +115,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
         WHEN("Unpacking rows into multi-argument lists or standard tuples") {
             AND_WHEN("Extracting parallel sequential columns into individual targets") {
                 REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(3).TIMES(AT_LEAST(1));
-                REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(100);
+                REQUIRE_CALL(mock, sqlite3_column_int64(dummy_stmt, 0)).RETURN(100LL);
                 REQUIRE_CALL(mock, sqlite3_column_double(dummy_stmt, 1)).RETURN(2.5);
 
                 int a = 0;
@@ -131,7 +131,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
             AND_WHEN("Unpacking data into a structured tuple-like target") {
                 REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(2).TIMES(AT_LEAST(1));
-                REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(7);
+                REQUIRE_CALL(mock, sqlite3_column_int64(dummy_stmt, 0)).RETURN(7LL);
                 REQUIRE_CALL(mock, sqlite3_column_double(dummy_stmt, 1)).RETURN(4.4);
 
                 THEN("Hydrate an existing lvalue tuple container directly") {
@@ -187,25 +187,25 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                 THEN("Fail inside the multi-unpacker with no_active_row") {
                     REQUIRE_FALSE(status.has_value());
-                    CHECK(status.error() == sqlixx::errc::invalid_column_index);
+                    CHECK(status.error() == sqlixx::errc::invalid_index);
                 }
             }
 
             AND_WHEN("Unpacking more columns than there are in the row") {
                 REQUIRE_CALL(mock, sqlite3_data_count(dummy_stmt)).RETURN(1);
-                REQUIRE_CALL(mock, sqlite3_column_int(dummy_stmt, 0)).RETURN(2);
+                REQUIRE_CALL(mock, sqlite3_column_int64(dummy_stmt, 0)).RETURN(2LL);
 
                 int i = 0;
-                sqlixx::row_context ctxt{stmt.get()};
+                sqlixx::reader_context ctxt{stmt.get()};
 
                 AND_WHEN("Reading an excess integral value in a tie") {
                     int j = 0;
 
                     auto status = sqlixx::read(ctxt, std::tie(i, j));
 
-                    THEN("Fail with invalid_column_index") {
+                    THEN("Fail with invalid_index") {
                         REQUIRE_FALSE(status);
-                        CHECK(status.error() == sqlixx::errc::invalid_column_index);
+                        CHECK(status.error() == sqlixx::errc::invalid_index);
                     }
                 }
 
@@ -214,9 +214,9 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                     auto status = sqlixx::read(ctxt, std::tie(i, d));
 
-                    THEN("Fail with invalid_column_index") {
+                    THEN("Fail with invalid_index") {
                         REQUIRE_FALSE(status);
-                        CHECK(status.error() == sqlixx::errc::invalid_column_index);
+                        CHECK(status.error() == sqlixx::errc::invalid_index);
                     }
                 }
 
@@ -225,9 +225,9 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                     auto status = sqlixx::read(ctxt, std::tie(i, s));
 
-                    THEN("Fail with invalid_column_index") {
+                    THEN("Fail with invalid_index") {
                         REQUIRE_FALSE(status);
-                        CHECK(status.error() == sqlixx::errc::invalid_column_index);
+                        CHECK(status.error() == sqlixx::errc::invalid_index);
                     }
                 }
 
@@ -236,9 +236,9 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                     auto status = sqlixx::read(ctxt, std::tie(i, b));
 
-                    THEN("Fail with invalid_column_index") {
+                    THEN("Fail with invalid_index") {
                         REQUIRE_FALSE(status);
-                        CHECK(status.error() == sqlixx::errc::invalid_column_index);
+                        CHECK(status.error() == sqlixx::errc::invalid_index);
                     }
                 }
 
@@ -247,9 +247,9 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                     auto status = sqlixx::read(ctxt, i, j);
 
-                    THEN("Fail with invalid_column_index") {
+                    THEN("Fail with invalid_index") {
                         REQUIRE_FALSE(status);
-                        CHECK(status.error() == sqlixx::errc::invalid_column_index);
+                        CHECK(status.error() == sqlixx::errc::invalid_index);
                     }
                 }
             }
@@ -262,7 +262,7 @@ SCENARIO("Verify column and tuple reader mechanics via row_context", "[readers]"
 
                 THEN("Propagate the inner unexpected status error all the way out") {
                     REQUIRE_FALSE(res.has_value());
-                    CHECK(res.error() == sqlixx::errc::invalid_column_index);
+                    CHECK(res.error() == sqlixx::errc::invalid_index);
                 }
             }
         }

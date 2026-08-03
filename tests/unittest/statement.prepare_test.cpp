@@ -11,115 +11,182 @@ import sqlixx;
 
 using trompeloeil::_;
 
-SCENARIO("Verify statement preparation factory behavior and tail string processing", "[statement][prepare]") {
-    GIVEN("A registered SQLite mock and an active connection handle") {
-        using namespace std::string_view_literals;
-        sqlite_mock mock;
+TEST_CASE("Preparing a statement", "[statement]") {
+    sqlite_mock mock;
+    auto* dummy_db_handle = reinterpret_cast<::sqlite3*>(0xBAAD5EED);
+    auto* dummy_stmt_handle = reinterpret_cast<::sqlite3_stmt*>(0x00FEE16D);
+    sqlixx::connection_handle conn{dummy_db_handle};
 
-        auto* dummy_db = reinterpret_cast<::sqlite3*>(0xBAAD5EED);
-        auto* dummy_stmt = reinterpret_cast<::sqlite3_stmt*>(0xBABEFACE);
-        sqlixx::connection_handle conn(dummy_db);
+    SECTION("Preparing a null-terminated string statement with default flags") {
+        const auto* sql = "SELECT * FROM USERS;";
+        const auto* tail_ptr = sql + std::strlen(sql);
 
-        WHEN("Preparing a statement from a traditional null-terminated C-string") {
-            const auto* sql = "SELECT * FROM users;";
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql, -1, 0, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = tail_ptr)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
-            AND_WHEN("Invoking preparation with default flags") {
-                REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db, _, -1, 0, _, _))
-                    .WITH(std::string_view(_2) == sql)
-                    .SIDE_EFFECT(*_5 = dummy_stmt)
-                    .SIDE_EFFECT(*_6 = sql + std::strlen(sql))
-                    .RETURN(SQLITE_OK);
+        auto result = sqlixx::prepare_statement(conn, sql);
 
-                REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt)).RETURN(SQLITE_OK);
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.empty());
+    }
 
-                auto result = sqlixx::prepare_statement(conn, sql);
+    SECTION("Preparing a null-terminated string statement with static custom flags") {
+        const auto* sql = "SELECT * FROM USERS;";
+        const auto expected_flags = SQLITE_PREPARE_PERSISTENT | SQLITE_PREPARE_NORMALIZE;
+        const auto* tail_ptr = sql + std::strlen(sql);
 
-                THEN("Return a valid statement holding the handle and an empty tail view") {
-                    REQUIRE(result.has_value());
-                    CHECK(result->stmt.get() == dummy_stmt);
-                    CHECK(result->tail.empty());
-                }
-            }
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql, -1, expected_flags, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = tail_ptr)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
-            AND_WHEN("Invoking preparation with custom dynamic flags") {
-                REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db, _, -1, SQLITE_PREPARE_PERSISTENT, _, _))
-                    .WITH(std::string_view(_2) == sql)
-                    .SIDE_EFFECT(*_5 = dummy_stmt)
-                    .SIDE_EFFECT(*_6 = sql + std::strlen(sql))
-                    .RETURN(SQLITE_OK);
+        auto result = sqlixx::prepare_statement(conn, sql, sqlixx::prep::persistent, sqlixx::prep::normalize);
 
-                REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt)).RETURN(SQLITE_OK);
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.empty());
+    }
 
-                auto dynamic_persistent = sqlixx::prep::dyn_flags(SQLITE_PREPARE_PERSISTENT);
-                auto result = sqlixx::prepare_statement(conn, sql, dynamic_persistent);
+    SECTION("Preparing a null-terminated string statement with dynamic custom flags") {
+        const auto* sql = "SELECT * FROM USERS;";
+        const auto expected_flags = SQLITE_PREPARE_PERSISTENT | SQLITE_PREPARE_NORMALIZE;
+        const auto* tail_ptr = sql + std::strlen(sql);
 
-                THEN("Forward flags correctly and pass validation hooks") {
-                    REQUIRE(result.has_value());
-                }
-            }
-        }
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql, -1, expected_flags, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = tail_ptr)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
-        WHEN("Preparing a statement from a modern std::string_view") {
-            AND_WHEN("Multiple statements are chained together inside the view context") {
-                auto sql = "SELECT 1; SELECT 2;"sv;
-                auto expected_len = static_cast<int>(sql.size());
-                auto expected_flags = SQLITE_PREPARE_PERSISTENT | SQLITE_PREPARE_NORMALIZE;
-                const auto* const expected_tail_ptr = sql.data() + 9;
+        auto dynflags = sqlixx::prep::dyn_flags(SQLITE_PREPARE_NORMALIZE);
+        auto result = sqlixx::prepare_statement(conn, sql, sqlixx::prep::persistent, dynflags);
 
-                REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db, sql.data(), expected_len, expected_flags, _, _))
-                    .SIDE_EFFECT(*_5 = dummy_stmt)
-                    .SIDE_EFFECT(*_6 = expected_tail_ptr)
-                    .RETURN(SQLITE_OK);
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.empty());
+    }
 
-                REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt)).RETURN(SQLITE_OK);
+    SECTION("Preparing an std::string_view statement with default flags") {
+        const auto sql = std::string_view{"SELECT * FROM USERS;"};
+        const auto* tail_ptr = sql.data() + sql.size();
 
-                auto result = sqlixx::prepare_statement(conn, sql, sqlixx::prep::persistent, sqlixx::prep::normalize);
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql.data(), sql.size(), 0, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = tail_ptr)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
-                THEN("Extract the exact remaining tail sub-string view correctly") {
-                    REQUIRE(result.has_value());
-                    CHECK(result->stmt.get() == dummy_stmt);
-                    CHECK(result->tail == " SELECT 2;"sv);
-                }
-            }
+        auto result = sqlixx::prepare_statement(conn, sql);
 
-            AND_WHEN("The single statement consumes the complete length of the view container") {
-                auto sql = "SELECT 1;"sv;
-                auto expected_len = static_cast<int>(sql.size());
-                const auto* const expected_tail_ptr = sql.data() + sql.size();
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.empty());
+    }
 
-                REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db, sql.data(), expected_len, 0, _, _))
-                    .SIDE_EFFECT(*_5 = dummy_stmt)
-                    .SIDE_EFFECT(*_6 = expected_tail_ptr)
-                    .RETURN(SQLITE_OK);
+    SECTION("Preparing an std::string_view statement with static custom flags") {
+        const auto sql = std::string_view{"SELECT * FROM USERS;"};
+        const auto expected_flags = SQLITE_PREPARE_PERSISTENT | SQLITE_PREPARE_NORMALIZE;
+        const auto* tail_ptr = sql.data() + sql.size();
 
-                REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt)).RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql.data(), sql.size(), expected_flags, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = tail_ptr)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
-                auto result = sqlixx::prepare_statement(conn, sql);
+        auto result = sqlixx::prepare_statement(conn, sql, sqlixx::prep::persistent, sqlixx::prep::normalize);
 
-                THEN("Return a valid statement object alongside an empty tail reference") {
-                    REQUIRE(result.has_value());
-                    CHECK(result->stmt.get() == dummy_stmt);
-                    CHECK(result->tail.empty());
-                }
-            }
-        }
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.empty());
+    }
 
-        WHEN("Failing to prepare a statement due to bad syntax") {
-            const auto* const sql = "SELECT INVALID SYNTAX;";
+    SECTION("Preparing an std::string_view statement with dynamic custom flags") {
+        const auto sql = std::string_view{"SELECT * FROM USERS;"};
+        const auto expected_flags = SQLITE_PREPARE_PERSISTENT | SQLITE_PREPARE_NORMALIZE;
+        const auto* tail_ptr = sql.data() + sql.size();
 
-            REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db, _, -1, 0, _, _))
-                .WITH(std::string_view(_2) == sql)
-                .SIDE_EFFECT(*_5 = nullptr)
-                .RETURN(SQLITE_ERROR);
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql.data(), sql.size(), expected_flags, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = tail_ptr)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
-            FORBID_CALL(mock, sqlite3_finalize(_));
+        auto dynflags = sqlixx::prep::normalize;
+        auto result = sqlixx::prepare_statement(conn, sql, sqlixx::prep::persistent, dynflags);
 
-            auto result = sqlixx::prepare_statement(conn, sql);
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.empty());
+    }
 
-            THEN("Return an unexpected error code container without leaking resources") {
-                REQUIRE_FALSE(result.has_value());
-                CHECK(result.error() == sqlixx::sqlite_errc::error);
-            }
-        }
+    SECTION("Preparing a null-terminated string statement with remainder") {
+        const auto* sql = "SELECT * FROM USERS; SELECT * FROM GROUPS;";
+        const auto* expected_tail = std::strchr(sql, ';') + 1;
+
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql, -1, 0, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = expected_tail)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
+
+        auto result = sqlixx::prepare_statement(conn, sql);
+
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.data() == expected_tail);
+        CHECK(result->tail.size() == std::strlen(expected_tail));
+    }
+
+    SECTION("Preparing an std::string_view statement with remainder") {
+        const auto sql = std::string_view{"SELECT * FROM USERS; SELECT * FROM GROUPS;"};
+        const auto expected_tail = sql.substr(sql.find(';') + 1);
+
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql.data(), sql.size(), 0, _, _))
+            .SIDE_EFFECT(*_5 = dummy_stmt_handle)
+            .SIDE_EFFECT(*_6 = expected_tail.data())
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
+
+        auto result = sqlixx::prepare_statement(conn, sql);
+
+        CHECK(result);
+        CHECK(result->stmt.get() == dummy_stmt_handle);
+        CHECK(result->tail.data() == expected_tail.data());
+        CHECK(result->tail.size() == expected_tail.size());
+    }
+
+    SECTION("Preparing an empty statement") {
+        const auto* sql = "";
+
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql, -1, 0, _, _))
+            .SIDE_EFFECT(*_5 = nullptr)
+            .SIDE_EFFECT(*_6 = sql)
+            .RETURN(SQLITE_OK);
+
+        auto result = sqlixx::prepare_statement(conn, sql);
+
+        CHECK(result);
+        CHECK(result->stmt.get() == nullptr);
+        CHECK(result->tail.empty());
+    }
+
+    SECTION("Error while preparing") {
+        const auto* sql = "SELECT * FROM LUSERS;";
+
+        REQUIRE_CALL(mock, sqlite3_prepare_v3(dummy_db_handle, sql, -1, 0, _, _))
+            .SIDE_EFFECT(*_5 = nullptr)
+            .SIDE_EFFECT(*_6 = nullptr)
+            .RETURN(SQLITE_ERROR);
+
+        auto result = sqlixx::prepare_statement(conn, sql);
+
+        CHECK_FALSE(result);
+        CHECK(result.error() == sqlixx::sqlite_errc::error);
     }
 }

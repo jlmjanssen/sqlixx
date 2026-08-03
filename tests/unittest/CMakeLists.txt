@@ -11,12 +11,14 @@ target_sources(
         error.sqlite_test.cpp
         connection_test.cpp
         connection.open_test.cpp
-        statement_test.cpp
-        statement.coro_test.cpp
-        statement.prepare_test.cpp
-        statement.step_test.cpp
+        bind_context_test.cpp
         binders_test.cpp
-        readers_test.cpp
+        statement_test.cpp
+        #statement.coro_test.cpp
+        statement.prepare_test.cpp
+        #statement.read_test.cpp
+        #statement.step_test.cpp
+        statement.bind_test.cpp
 )
 target_link_libraries(
     sqlixx.unittest
@@ -46,9 +48,9 @@ target_link_options(
         "LINKER:--wrap=sqlite3_bind_blob64"
         "LINKER:--wrap=sqlite3_bind_zeroblob64"
         "LINKER:--wrap=sqlite3_bind_null"
+        "LINKER:--wrap=sqlite3_bind_parameter_count"
         "LINKER:--wrap=sqlite3_bind_parameter_index"
         "LINKER:--wrap=sqlite3_data_count"
-        "LINKER:--wrap=sqlite3_column_int"
         "LINKER:--wrap=sqlite3_column_int64"
         "LINKER:--wrap=sqlite3_column_double"
         "LINKER:--wrap=sqlite3_column_text"

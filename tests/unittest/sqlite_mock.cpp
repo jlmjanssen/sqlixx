@@ -132,6 +132,13 @@ int __wrap_sqlite3_bind_null(sqlite3_stmt* pStmt, int i) {
     return __real_sqlite3_bind_null(pStmt, i);
 }
 
+int __wrap_sqlite3_bind_parameter_count(sqlite3_stmt* pStmt) {
+    int __real_sqlite3_bind_parameter_count(sqlite3_stmt * pStmt);
+    if (sqlite_mock::mock_ != nullptr)
+        return sqlite_mock::mock_->sqlite3_bind_parameter_count(pStmt);
+    return __real_sqlite3_bind_parameter_count(pStmt);
+}
+
 int __wrap_sqlite3_bind_parameter_index(sqlite3_stmt* pStmt, const char* zName) {
     int __real_sqlite3_bind_parameter_index(sqlite3_stmt * pStmt, const char* zName);
     if (sqlite_mock::mock_ != nullptr)
@@ -144,13 +151,6 @@ int __wrap_sqlite3_data_count(sqlite3_stmt* stmt) {
     if (sqlite_mock::mock_ != nullptr)
         return sqlite_mock::mock_->sqlite3_data_count(stmt);
     return __real_sqlite3_data_count(stmt);
-}
-
-int __wrap_sqlite3_column_int(sqlite3_stmt* stmt, int column) {
-    int __real_sqlite3_column_int(sqlite3_stmt * stmt, int column);
-    if (sqlite_mock::mock_ != nullptr)
-        return sqlite_mock::mock_->sqlite3_column_int(stmt, column);
-    return __real_sqlite3_column_int(stmt, column);
 }
 
 sqlite3_int64 __wrap_sqlite3_column_int64(sqlite3_stmt* stmt, int column) {

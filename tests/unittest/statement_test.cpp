@@ -103,7 +103,7 @@ TEST_CASE("Lifetime management of a statement", "[statement][handle]") {
     }
 
     SECTION("An explicit constructed statement_handle") {
-        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
         sqlixx::statement stmt{dummy_stmt_handle};
 
@@ -112,7 +112,7 @@ TEST_CASE("Lifetime management of a statement", "[statement][handle]") {
     }
 
     SECTION("A move constructed statement") {
-        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
         sqlixx::statement stmt1{dummy_stmt_handle};
         sqlixx::statement stmt2{std::move(stmt1)};
@@ -125,7 +125,7 @@ TEST_CASE("Lifetime management of a statement", "[statement][handle]") {
     }
 
     SECTION("A move assigned statement") {
-        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
         sqlixx::statement stmt1{dummy_stmt_handle};
         sqlixx::statement stmt2;
@@ -140,7 +140,7 @@ TEST_CASE("Lifetime management of a statement", "[statement][handle]") {
     }
 
     SECTION("A self-move assigned statement") {
-        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
         sqlixx::statement stmt{dummy_stmt_handle};
 
@@ -161,12 +161,12 @@ TEST_CASE("Lifetime management of a statement", "[statement][handle]") {
     }
 }
 
-TEST_CASE("conversion management of a statement", "[statement][handle]") {
+TEST_CASE("Conversion management of a statement", "[statement][handle]") {
     sqlite_mock mock;
     auto* dummy_stmt_handle = reinterpret_cast<::sqlite3_stmt*>(0xBAAD5EED);
 
     SECTION("Implicit conversion to statement_handle") {
-        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_finalize(dummy_stmt_handle)).RETURN(SQLITE_OK);
 
         sqlixx::statement stmt{dummy_stmt_handle};
         sqlixx::statement_handle stmt_handle = stmt;

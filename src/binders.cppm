@@ -2,121 +2,178 @@
 // SPDX-License-Identifier: BSL-1.0
 
 module;
+
 #include <sqlite3.h>
+
 export module sqlixx:binders;
+
 import std;
 import :error.sqlite;
-import :statement;
+import :binder_context;
 
 namespace sqlixx {
 
 template <typename T>
 struct binder;
 
-export struct bind_context {
-    enum class copy_strategy : bool { deep, shallow };
+template <typename T>
+struct binder_registry;
 
-    explicit bind_context(statement_handle stmt, int index = 1) noexcept : handle_(stmt.get()), index_(index) {
-        set_copy_strategy(copy_strategy::deep);
-    }
-    bind_context(statement_handle stmt, copy_strategy strategy) noexcept : handle_(stmt.get()), index_(1) {
-        set_copy_strategy(strategy);
-    }
-    bind_context(statement_handle stmt, ::sqlite3_destructor_type destructor) noexcept
-        : handle_(stmt.get()), index_(1) {
-        set_destructor(destructor);
-    }
-    bind_context(statement_handle stmt, int index, copy_strategy strategy) noexcept
-        : handle_(stmt.get()), index_(index) {
-        set_copy_strategy(strategy);
-    }
-    bind_context(statement_handle stmt, int index, ::sqlite3_destructor_type destructor) noexcept
-        : handle_(stmt.get()), index_(index) {
-        set_destructor(destructor);
-    }
+export template <typename T>
+using binder_t = binder_registry<std::remove_cvref_t<T>>::type;
 
-    auto set_copy_strategy(copy_strategy strategy) noexcept -> void {
-        if (strategy == copy_strategy::deep) {
-            // NOLINTNEXTLINE(performance-*,cppcoreguidelines-*)
-            destructor_ = reinterpret_cast<::sqlite3_destructor_type>(-1); // SQLITE_TRANSIENT
-        } else {
-            destructor_ = nullptr; // SQLITE_STATIC
-        }
-    }
-    auto set_destructor(::sqlite3_destructor_type destructor) noexcept -> void { destructor_ = destructor; }
-
-private:
-    template <typename T>
-    friend struct binder;
-
-    ::sqlite3_stmt* handle_;
-    int index_;
-    ::sqlite3_destructor_type destructor_ = nullptr;
-};
-
-[[nodiscard]] constexpr auto to_expected(int result_code) -> std::expected<void, std::error_code> {
+[[nodiscard]] constexpr auto to_expected(int result_code) noexcept -> std::expected<void, std::error_code> {
     if (result_code != SQLITE_OK) {
         return std::unexpected(make_sqlite_error_code(result_code));
     }
     return {};
 }
 
-template <std::integral T>
+template <typename T>
+concept bindable_integer = std::integral<T> && requires {
+    requires((sizeof(T) < sizeof(std::int64_t)) || ((sizeof(T) == sizeof(std::int64_t)) && std::is_signed_v<T>));
+};
+
+template <bindable_integer T>
 struct binder<T> {
-    [[nodiscard]] auto operator()(bind_context& ctxt, T value) const noexcept -> std::expected<void, std::error_code> {
-        if constexpr (sizeof(T) < sizeof(int) || (sizeof(T) == sizeof(int) && std::is_signed_v<T>)) {
-            return to_expected(::sqlite3_bind_int(ctxt.handle_, ctxt.index_++, static_cast<int>(value)));
-        } else if constexpr (sizeof(T) < sizeof(std::int64_t) ||
-                             (sizeof(T) == sizeof(std::int64_t) && std::is_signed_v<T>)) {
-            return to_expected(::sqlite3_bind_int64(ctxt.handle_, ctxt.index_++, static_cast<std::int64_t>(value)));
-        } else {
-            static_assert(sizeof(T) == 0, "Unsupported integral size");
-        }
+    [[nodiscard]] auto operator()(binder_context& ctxt, T value) const noexcept
+        -> std::expected<void, std::error_code> {
+        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+            if constexpr ((sizeof(T) < sizeof(int)) || ((sizeof(T) == sizeof(int)) && std::is_signed_v<T>)) {
+                return to_expected(::sqlite3_bind_int(ctxt.get(), idx, static_cast<int>(value)));
+            } else {
+                return to_expected(::sqlite3_bind_int64(ctxt.get(), idx, static_cast<std::int64_t>(value)));
+            }
+        });
     }
 };
 
-template <std::floating_point T>
+template <bindable_integer T>
+struct binder_registry<T> {
+    using type = binder<T>;
+};
+
+template <typename T>
+    requires std::is_enum_v<T>
 struct binder<T> {
-    [[nodiscard]] auto operator()(bind_context& ctxt, T value) const noexcept -> std::expected<void, std::error_code> {
-        if constexpr (sizeof(T) <= sizeof(double)) {
-            return to_expected(::sqlite3_bind_double(ctxt.handle_, ctxt.index_++, static_cast<double>(value)));
-        } else {
-            static_assert(sizeof(T) == 0, "Unsupported floating point size");
-        }
+    [[nodiscard]] auto operator()(binder_context& ctxt, T value) const noexcept
+        -> std::expected<void, std::error_code> {
+        return binder_t<std::underlying_type_t<T>>{}(ctxt, std::to_underlying(value));
     }
 };
 
 template <typename T>
-    requires std::convertible_to<std::decay_t<T>, std::string_view>
+    requires std::is_enum_v<T>
+struct binder_registry<T> {
+    using type = binder<T>;
+};
+
+template <typename T>
+concept bindable_real = std::floating_point<T> && requires { requires(sizeof(T) <= sizeof(double)); };
+
+template <bindable_real T>
 struct binder<T> {
-    [[nodiscard]] auto operator()(bind_context& ctxt, const T& value) const noexcept
+    [[nodiscard]] auto operator()(binder_context& ctxt, T value) const noexcept
         -> std::expected<void, std::error_code> {
-        if constexpr (std::is_pointer_v<T>) {
-            return to_expected(::sqlite3_bind_text(
-                ctxt.handle_, ctxt.index_++, static_cast<const char*>(value), -1, ctxt.destructor_));
-        } else if constexpr (std::is_array_v<T>) {
-            constexpr std::size_t length = sizeof(T) - 1;
-            return to_expected(::sqlite3_bind_text(ctxt.handle_,
-                                                   ctxt.index_++,
-                                                   static_cast<const char*>(value),
-                                                   static_cast<int>(length),
-                                                   ctxt.destructor_));
-        } else {
-            std::string_view view = value;
-            return to_expected(::sqlite3_bind_text(
-                ctxt.handle_, ctxt.index_++, view.data(), static_cast<int>(view.size()), ctxt.destructor_));
-        }
+        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+            return to_expected(::sqlite3_bind_double(ctxt.get(), idx, static_cast<double>(value)));
+        });
     }
+};
+
+template <bindable_real T>
+struct binder_registry<T> {
+    using type = binder<T>;
+};
+
+template <>
+struct binder<std::nullptr_t> {
+    [[nodiscard]] auto operator()(binder_context& ctxt, std::nullptr_t) const noexcept
+        -> std::expected<void, std::error_code> {
+        return ctxt.get_and_advance_parameter_index().and_then(
+            [&ctxt](int idx) noexcept -> auto { return to_expected(::sqlite3_bind_null(ctxt.get(), idx)); });
+    }
+};
+
+template <>
+struct binder_registry<std::nullptr_t> {
+    using type = binder<std::nullptr_t>;
+};
+
+template <typename Char>
+struct binder_cstring {
+    auto operator()(binder_context& ctxt, const Char* value, int size = -1) const noexcept
+        -> std::expected<void, std::error_code> {
+        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value, size](int idx) noexcept -> auto {
+            // NOLINTNEXTLINE(cppcoreguidelines-*)
+            const auto* cstr = reinterpret_cast<const char*>(value);
+            return to_expected(sqlite3_bind_text(ctxt.get(), idx, cstr, size, ctxt.get_destructor()));
+        });
+    }
+};
+
+template <>
+struct binder_registry<const char*> {
+    using type = binder_cstring<char>;
+};
+
+template <>
+struct binder_registry<char*> {
+    using type = binder_cstring<char>;
+};
+
+template <>
+struct binder_registry<const char8_t*> {
+    using type = binder_cstring<char8_t>;
+};
+
+template <>
+struct binder_registry<char8_t*> {
+    using type = binder_cstring<char8_t>;
+};
+
+template <>
+struct binder<std::string_view> {
+    auto operator()(binder_context& ctxt, std::string_view value) const noexcept
+        -> std::expected<void, std::error_code> {
+        return binder_cstring<char>{}(ctxt, value.data(), static_cast<int>(value.size()));
+    }
+};
+
+template <>
+struct binder_registry<std::string_view> {
+    using type = binder<std::string_view>;
+};
+
+template <>
+struct binder<std::u8string_view> {
+    auto operator()(binder_context& ctxt, std::u8string_view value) const noexcept
+        -> std::expected<void, std::error_code> {
+        return binder_cstring<char8_t>{}(ctxt, value.data(), static_cast<int>(value.size()));
+    }
+};
+
+template <>
+struct binder_registry<std::u8string_view> {
+    using type = binder<std::u8string_view>;
 };
 
 template <typename T, std::size_t Extent>
     requires std::is_trivially_copyable_v<T>
 struct binder<std::span<T, Extent>> {
-    [[nodiscard]] auto operator()(bind_context& ctxt, std::span<T, Extent> value) const noexcept
+    [[nodiscard]] auto operator()(binder_context& ctxt, std::span<T, Extent> value) const noexcept
         -> std::expected<void, std::error_code> {
-        return to_expected(::sqlite3_bind_blob64(
-            ctxt.handle_, ctxt.index_++, static_cast<const void*>(value.data()), value.size_bytes(), ctxt.destructor_));
+        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+            return to_expected(::sqlite3_bind_blob64(
+                ctxt.get(), idx, static_cast<const void*>(value.data()), value.size_bytes(), ctxt.get_destructor()));
+        });
     }
+};
+
+template <typename T, std::size_t Extent>
+    requires std::is_trivially_copyable_v<T>
+struct binder_registry<std::span<T, Extent>> {
+    using type = binder<std::span<T, Extent>>;
 };
 
 export struct zeroblob {
@@ -125,18 +182,17 @@ export struct zeroblob {
 
 template <>
 struct binder<zeroblob> {
-    [[nodiscard]] auto operator()(bind_context& ctxt, zeroblob value) const noexcept
+    [[nodiscard]] auto operator()(binder_context& ctxt, zeroblob value) const noexcept
         -> std::expected<void, std::error_code> {
-        return to_expected(::sqlite3_bind_zeroblob64(ctxt.handle_, ctxt.index_++, value.size));
+        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+            return to_expected(::sqlite3_bind_zeroblob64(ctxt.get(), idx, value.size));
+        });
     }
 };
 
 template <>
-struct binder<std::nullptr_t> {
-    [[nodiscard]] auto operator()(bind_context& ctxt, std::nullptr_t) const noexcept
-        -> std::expected<void, std::error_code> {
-        return to_expected(::sqlite3_bind_null(ctxt.handle_, ctxt.index_++));
-    }
+struct binder_registry<zeroblob> {
+    using type = binder<zeroblob>;
 };
 
 template <typename T>
@@ -145,37 +201,34 @@ concept is_tuple_like = requires { typename std::tuple_size<std::decay_t<T>>::ty
 template <is_tuple_like T>
 struct binder<T> {
     template <typename Tuple>
-    [[nodiscard]] auto operator()(bind_context& ctxt, Tuple&& tuple) const noexcept
-        -> std::expected<void, std::error_code> {
+    auto operator()(binder_context& ctxt, Tuple&& tuple) const noexcept -> std::expected<void, std::error_code> {
+        using TupleD = std::decay_t<Tuple>;
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) noexcept -> auto {
             std::expected<void, std::error_code> result{};
-            std::ignore = ((result = binder<std::remove_cvref_t<std::tuple_element_t<Is, std::decay_t<Tuple>>>>{}(
+            std::ignore = ((result = binder_t<std::tuple_element_t<Is, TupleD>>{}(
                                 ctxt, std::get<Is>(std::forward<Tuple>(tuple)))) &&
                            ...);
             return result;
-        }(std::make_index_sequence<std::tuple_size_v<std::decay_t<Tuple>>>{});
+        }(std::make_index_sequence<std::tuple_size_v<TupleD>>{});
     }
 };
 
-export template <typename... Args>
-[[nodiscard]] auto bind(bind_context& ctxt, Args&&... args) noexcept -> std::expected<void, std::error_code> {
-    std::expected<void, std::error_code> result{};
-    std::ignore = ((result = binder<std::remove_cvref_t<Args>>{}(ctxt, std::forward<Args>(args))) && ...);
-    return result;
-}
+template <is_tuple_like T>
+struct binder_registry<T> {
+    using type = binder<T>;
+};
 
-export template <typename... Args>
-[[nodiscard]] auto bind(statement_handle stmt, int index, Args&&... args) noexcept
-    -> std::expected<void, std::error_code> {
-    bind_context ctxt{stmt, index};
-    return bind(ctxt, std::forward<Args>(args)...);
-}
+template <typename T>
+struct binder<std::optional<T>> {
+    [[nodiscard]] auto operator()(binder_context& ctxt, const std::optional<T>& value) const noexcept
+        -> std::expected<void, std::error_code> {
+        return value ? binder_t<T>{}(ctxt, *value) : binder_t<std::nullptr_t>{}(ctxt, nullptr);
+    }
+};
 
-export template <typename... Args>
-[[nodiscard]] auto bind(statement_handle stmt, const char* name, Args&&... args) noexcept
-    -> std::expected<void, std::error_code> {
-    bind_context ctxt{stmt, ::sqlite3_bind_parameter_index(stmt.get(), name)};
-    return bind(ctxt, std::forward<Args>(args)...);
-}
+template <typename T>
+struct binder_registry<std::optional<T>> {
+    using type = binder<std::optional<T>>;
+};
 
 } // namespace sqlixx

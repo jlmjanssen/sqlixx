@@ -11,129 +11,227 @@ import sqlixx;
 
 using trompeloeil::_;
 
-SCENARIO("Verify connection factory methods behavior and resource initialization", "[connection][open]") {
-    GIVEN("A registered SQLite mock instance") {
-        sqlite_mock mock;
-        const auto* db_name = "test.db";
-        auto* dummy_db = reinterpret_cast<::sqlite3*>(0xBAAD5EED);
+TEST_CASE("Opening a database connection", "[connection]") {
+    sqlite_mock mock;
+    const auto* db_name = "test.db";
+    const auto* vfs_name = "unix-posix";
+    auto* dummy_db_handle = reinterpret_cast<::sqlite3*>(0xBAAD5EED);
 
-        WHEN("Opening a connection successfully") {
-            AND_WHEN("Invoking factory with default flags") {
-                auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+    SECTION("Opening with default flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
 
-                REQUIRE_CALL(mock, sqlite3_open_v2(_, _, expected_flags, nullptr))
-                    .WITH(std::string_view(_1) == db_name)
-                    .SIDE_EFFECT(*_2 = dummy_db)
-                    .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-                REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db)).RETURN(SQLITE_OK);
+        auto result = sqlixx::open_connection(db_name);
 
-                auto result = sqlixx::open_connection(db_name);
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+    }
 
-                THEN("Return a valid connection holding the expected SQLite database handle") {
-                    REQUIRE(result.has_value());
-                    CHECK(result->get() == dummy_db);
-                }
-            }
+    SECTION("Opening with static custom flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_EXRESCODE;
 
-            AND_WHEN("Invoking factory with custom VFS and dynamic flags") {
-                const auto* vfs_name = "unix-dotfile";
-                auto expected_flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_PRIVATECACHE | SQLITE_OPEN_EXRESCODE;
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-                REQUIRE_CALL(mock, sqlite3_open_v2(_, _, expected_flags, _))
-                    .WITH(std::string_view(_1) == db_name && std::string_view(_4) == vfs_name)
-                    .SIDE_EFFECT(*_2 = dummy_db)
-                    .RETURN(SQLITE_OK);
+        auto result = sqlixx::open_connection(db_name, sqlixx::open::readwrite, sqlixx::open::fullmutex);
 
-                REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db)).RETURN(SQLITE_OK);
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+    }
 
-                auto privatecache = sqlixx::open::dyn_flags(SQLITE_OPEN_PRIVATECACHE);
-                auto result = sqlixx::open_connection(db_name, vfs_name, sqlixx::open::readonly, privatecache);
+    SECTION("Opening with dynamic custom flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_SHAREDCACHE | SQLITE_OPEN_EXRESCODE;
 
-                THEN("Apply flags correctly and construct the connection container") {
-                    REQUIRE(result.has_value());
-                }
-            }
-        }
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-        WHEN("Failing to open a connection") {
-            AND_WHEN("Aborting with standard flags without a custom error handler") {
-                auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+        auto dynflags = sqlixx::open::dyn_flags(SQLITE_OPEN_SHAREDCACHE);
+        auto result = sqlixx::open_connection(db_name, sqlixx::open::readwrite, dynflags);
 
-                REQUIRE_CALL(mock, sqlite3_open_v2(_, _, expected_flags, nullptr))
-                    .WITH(std::string_view(_1) == db_name)
-                    .SIDE_EFFECT(*_2 = dummy_db)
-                    .RETURN(SQLITE_CANTOPEN);
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+    }
 
-                FORBID_CALL(mock, sqlite3_errmsg(_));
+    SECTION("Opening with a vfs and default flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
 
-                REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db)).RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, vfs_name))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-                auto result = sqlixx::open_connection(db_name);
+        auto result = sqlixx::open_connection(db_name, vfs_name);
 
-                THEN("Return an unexpected error code representing the failure") {
-                    REQUIRE_FALSE(result.has_value());
-                    CHECK(result.error() == sqlixx::sqlite_errc::cantopen);
-                }
-            }
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+    }
 
-            AND_WHEN("Aborting with an allocated handle and an active error handler callback") {
-                const auto* bad_db_name = "invalid.db";
-                const auto* dummy_errmsg = "Invalid path";
-                auto error_handler_called = false;
+    SECTION("Opening with a vfs and custom flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_EXRESCODE;
 
-                auto handler = [&](std::error_code ec, std::string_view msg) noexcept -> void {
-                    CHECK(ec == sqlixx::sqlite_errc::cantopen);
-                    CHECK(msg == dummy_errmsg);
-                    error_handler_called = true;
-                };
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, vfs_name))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-                REQUIRE_CALL(mock, sqlite3_open_v2(_, _, _, nullptr))
-                    .WITH(std::string_view(_1) == bad_db_name)
-                    .SIDE_EFFECT(*_2 = dummy_db)
-                    .RETURN(SQLITE_CANTOPEN);
+        auto result = sqlixx::open_connection(db_name, vfs_name, sqlixx::open::readwrite);
 
-                REQUIRE_CALL(mock, sqlite3_errmsg(dummy_db)).RETURN(dummy_errmsg);
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+    }
 
-                REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db)).RETURN(SQLITE_OK);
+    SECTION("Opening with an error handler and default flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
 
-                auto result = sqlixx::open_connection(bad_db_name, handler, sqlixx::open::readwrite);
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-                THEN("Trigger the callback with detailed context and clean up the temporary handle") {
-                    REQUIRE_FALSE(result.has_value());
-                    CHECK(result.error() == sqlixx::sqlite_errc::cantopen);
-                    CHECK(error_handler_called);
-                }
-            }
+        bool on_error_called = false;
+        auto on_error = [&](auto ec, auto msg) noexcept -> void { on_error_called = true; };
 
-            AND_WHEN("Aborting with a null handle pointer and an active error handler callback") {
-                const auto* bad_db_name = "invalid.db";
-                const auto* vfs_name = "unix-none";
-                const auto* expected_errmsg = "No active connection";
-                auto error_handler_called = false;
+        auto result = sqlixx::open_connection(db_name, on_error);
 
-                auto handler = [&](std::error_code ec, std::string_view msg) noexcept -> void {
-                    CHECK(ec == sqlixx::sqlite_errc::nomem);
-                    CHECK(msg == expected_errmsg);
-                    error_handler_called = true;
-                };
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+        CHECK_FALSE(on_error_called);
+    }
 
-                REQUIRE_CALL(mock, sqlite3_open_v2(_, _, _, _))
-                    .WITH(std::string_view(_1) == bad_db_name && std::string_view(_4) == vfs_name)
-                    .SIDE_EFFECT(*_2 = nullptr)
-                    .RETURN(SQLITE_NOMEM);
+    SECTION("Opening with an error handler and custom flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_EXRESCODE;
 
-                FORBID_CALL(mock, sqlite3_errmsg(_));
-                FORBID_CALL(mock, sqlite3_close_v2(_));
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
-                auto result = sqlixx::open_connection(bad_db_name, vfs_name, handler);
+        bool on_error_called = false;
+        auto on_error = [&](auto ec, auto msg) noexcept -> void { on_error_called = true; };
 
-                THEN("Forward fallback diagnostics to handler without calling close hooks") {
-                    REQUIRE_FALSE(result.has_value());
-                    CHECK(result.error() == sqlixx::sqlite_errc::nomem);
-                    CHECK(error_handler_called);
-                }
-            }
-        }
+        auto result = sqlixx::open_connection(db_name, on_error, sqlixx::open::readwrite);
+
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+        CHECK_FALSE(on_error_called);
+    }
+
+    SECTION("Opening with a vfs, an error handler, and default flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, vfs_name))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
+
+        bool on_error_called = false;
+        auto on_error = [&](auto ec, auto msg) noexcept -> void { on_error_called = true; };
+
+        auto result = sqlixx::open_connection(db_name, vfs_name, on_error);
+
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+        CHECK_FALSE(on_error_called);
+    }
+
+    SECTION("Opening with a vfs, an error handler, and custom flags") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_EXRESCODE;
+
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, vfs_name))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_OK);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
+
+        bool on_error_called = false;
+        auto on_error = [&](auto ec, auto msg) noexcept -> void { on_error_called = true; };
+
+        auto result = sqlixx::open_connection(db_name, vfs_name, on_error, sqlixx::open::readwrite);
+
+        CHECK(result);
+        CHECK(result->get() == dummy_db_handle);
+        CHECK_FALSE(on_error_called);
+    }
+
+    SECTION("Error while opening") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_CANTOPEN);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
+
+        auto result = sqlixx::open_connection(db_name);
+
+        CHECK(!result);
+        CHECK(result.error() == sqlixx::sqlite_errc::cantopen);
+    }
+
+    SECTION("Out-of-memory error while opening") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = nullptr)
+            .RETURN(SQLITE_NOMEM);
+        FORBID_CALL(mock, sqlite3_close_v2(dummy_db_handle));
+
+        auto result = sqlixx::open_connection(db_name);
+
+        CHECK(!result);
+        CHECK(result.error() == sqlixx::sqlite_errc::nomem);
+    }
+
+    SECTION("Error while opening with an error handler") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+        const auto* expected_errmsg = "unable to open database file";
+
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = dummy_db_handle)
+            .RETURN(SQLITE_CANTOPEN);
+        REQUIRE_CALL(mock, sqlite3_errmsg(dummy_db_handle)).RETURN(expected_errmsg);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
+
+        bool on_error_called = false;
+        auto on_error = [&](auto ec, auto msg) noexcept -> void {
+            CHECK(ec == sqlixx::sqlite_errc::cantopen);
+            CHECK(msg == expected_errmsg);
+            on_error_called = true;
+        };
+
+        auto result = sqlixx::open_connection(db_name, on_error);
+
+        CHECK(!result);
+        CHECK(result.error() == sqlixx::sqlite_errc::cantopen);
+        CHECK(on_error_called);
+    }
+
+    SECTION("Out-of-memory error while opening with an error handler") {
+        const auto expected_flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_EXRESCODE;
+
+        REQUIRE_CALL(mock, sqlite3_open_v2(db_name, _, expected_flags, nullptr))
+            .SIDE_EFFECT(*_2 = nullptr)
+            .RETURN(SQLITE_NOMEM);
+        FORBID_CALL(mock, sqlite3_errmsg(dummy_db_handle));
+        FORBID_CALL(mock, sqlite3_close_v2(dummy_db_handle));
+
+        bool on_error_called = false;
+        auto on_error = [&](auto ec, auto msg) noexcept -> void {
+            CHECK(ec == sqlixx::sqlite_errc::nomem);
+            CHECK(msg.length() != 0);
+            on_error_called = true;
+        };
+
+        auto result = sqlixx::open_connection(db_name, on_error);
+
+        CHECK(!result);
+        CHECK(result.error() == sqlixx::sqlite_errc::nomem);
+        CHECK(on_error_called);
     }
 }

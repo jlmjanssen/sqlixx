@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: BSL-1.0
 
 export module sqlixx:handles;
+
 import std;
 
 namespace sqlixx {

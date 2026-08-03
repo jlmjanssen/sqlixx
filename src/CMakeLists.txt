@@ -12,10 +12,14 @@ target_sources(
                 handles.cppm
                 connection.cppm
                 connection.open.cppm
-                statement.cppm
-                statement.coro.cppm
-                statement.prepare.cppm
-                statement.step.cppm
+                index.cppm
+                binder_context.cppm
                 binders.cppm
                 readers.cppm
+                statement.cppm
+                statement.prepare.cppm
+                statement.bind.cppm
+                statement.read.cppm
+                statement.step.cppm
+                statement.coro.cppm
 )

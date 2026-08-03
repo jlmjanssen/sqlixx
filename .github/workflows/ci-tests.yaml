@@ -11,7 +11,7 @@ jobs:
   build-gcc-debug:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bemanproject/infra-containers-gcc:16
+      image: ghcr.io/bemanproject/infra-containers-gcc:15
     steps:
       - uses: actions/checkout@v7
       - run: cmake --workflow --preset=gcc-debug
@@ -19,7 +19,7 @@ jobs:
   build-gcc-release:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bemanproject/infra-containers-gcc:16
+      image: ghcr.io/bemanproject/infra-containers-gcc:15
     steps:
       - uses: actions/checkout@v7
       - run: cmake --workflow --preset=gcc-release

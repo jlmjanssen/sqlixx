@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: BSL-1.0
 
 module;
+
 #include <sqlite3.h>
+
 export module sqlixx:connection.open;
+
 import std;
 import :error.sqlite;
 import :connection;
@@ -46,14 +49,13 @@ concept is_flag = std::is_base_of_v<flag_t, std::decay_t<Flag>> && requires(std:
 template <typename... Flags>
 concept all_flags = (is_flag<Flags> && ...);
 
-template <typename... Flags>
+export template <typename... Flags>
     requires all_flags<Flags...>
-
 [[nodiscard]] constexpr auto make_flags(Flags... flags) noexcept -> int {
     if constexpr (sizeof...(Flags) == 0) {
-        return (SQLITE_OPEN_EXRESCODE | readwrite_create.get());
+        return readwrite_create.get();
     } else {
-        return (SQLITE_OPEN_EXRESCODE | ... | flags.get());
+        return (0 | ... | flags.get());
     }
 }
 
@@ -64,7 +66,7 @@ using error_handler = std::move_only_function<void(std::error_code, std::string_
 open_connection_impl(const char* filename, int flags, const char* vfs, open::error_handler on_error = nullptr) noexcept
     -> std::expected<connection, std::error_code> {
     ::sqlite3* handle = nullptr;
-    int result = ::sqlite3_open_v2(filename, &handle, flags, vfs);
+    const int result = ::sqlite3_open_v2(filename, &handle, flags | SQLITE_OPEN_EXRESCODE, vfs);
 
     if (result != SQLITE_OK) {
         const auto errcode = make_sqlite_error_code(result);

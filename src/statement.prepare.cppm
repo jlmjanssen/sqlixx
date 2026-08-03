@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: BSL-1.0
 
 module;
+
 #include <sqlite3.h>
+
 export module sqlixx:statement.prepare;
+
 import std;
 import :error.sqlite;
 import :connection;
@@ -46,7 +49,7 @@ concept is_flag = std::is_base_of_v<flag_t, std::decay_t<Flag>> && requires(std:
 template <typename... Flags>
 concept all_flags = (is_flag<Flags> && ...);
 
-template <typename... Flags>
+export template <typename... Flags>
     requires all_flags<Flags...>
 constexpr auto make_flags(Flags... flags) noexcept -> unsigned int {
     return (0U | ... | flags.get());
@@ -59,7 +62,7 @@ prepare_statement_impl(::sqlite3* db_handle, const char* sql_ptr, int byte_count
     ::sqlite3_stmt* stmt_handle = nullptr;
     const char* tail_ptr = nullptr;
 
-    int result = ::sqlite3_prepare_v3(db_handle, sql_ptr, byte_count, prep_flags, &stmt_handle, &tail_ptr);
+    const int result = ::sqlite3_prepare_v3(db_handle, sql_ptr, byte_count, prep_flags, &stmt_handle, &tail_ptr);
 
     if (result != SQLITE_OK) {
         return std::unexpected(make_sqlite_error_code(result));
@@ -70,10 +73,8 @@ prepare_statement_impl(::sqlite3* db_handle, const char* sql_ptr, int byte_count
     if (byte_count < 0) {
         tail = std::string_view(tail_ptr);
     } else {
-        std::ptrdiff_t consumed_bytes = tail_ptr - sql_ptr;
-        if (consumed_bytes < byte_count) {
-            tail = std::string_view(tail_ptr, static_cast<std::size_t>(byte_count - consumed_bytes));
-        }
+        auto consumed = tail_ptr - sql_ptr;
+        tail = std::string_view(tail_ptr, static_cast<std::size_t>(byte_count - consumed));
     }
 
     return prep_result{.stmt = statement(stmt_handle), .tail = tail};

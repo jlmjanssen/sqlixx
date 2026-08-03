@@ -21,11 +21,7 @@ TEST_CASE("Error handling with sqlixx error codes", "[error]") {
         }
 
         SECTION("Valid errors are not unknown") {
-            const auto code = GENERATE(sqlixx::errc::general_error,
-                                       sqlixx::errc::invalid_handle,
-                                       sqlixx::errc::invalid_argument,
-                                       sqlixx::errc::invalid_column_index,
-                                       sqlixx::errc::no_active_row);
+            const auto code = GENERATE(sqlixx::errc::invalid_index, sqlixx::errc::invalid_size);
 
             const auto message = category.message(std::to_underlying(code));
 
@@ -43,11 +39,7 @@ TEST_CASE("Error handling with sqlixx error codes", "[error]") {
     }
 
     SECTION("The sqlixx error codes") {
-        const auto code = GENERATE(sqlixx::errc::general_error,
-                                   sqlixx::errc::invalid_handle,
-                                   sqlixx::errc::invalid_argument,
-                                   sqlixx::errc::invalid_column_index,
-                                   sqlixx::errc::no_active_row);
+        const auto code = GENERATE(sqlixx::errc::invalid_index, sqlixx::errc::invalid_size);
 
         const auto error = sqlixx::make_error_code(code);
 

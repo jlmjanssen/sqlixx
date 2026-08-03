@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: BSL-1.0
 
 module;
+
 #include <sqlite3.h>
+
 export module sqlixx:statement;
+
 import std;
 import :handles;
 

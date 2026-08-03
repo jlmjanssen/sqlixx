@@ -103,7 +103,7 @@ TEST_CASE("Lifetime management of a connection", "[connection][handle]") {
     }
 
     SECTION("An explicit constructed connection_handle") {
-        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
         sqlixx::connection conn{dummy_db_handle};
 
@@ -112,7 +112,7 @@ TEST_CASE("Lifetime management of a connection", "[connection][handle]") {
     }
 
     SECTION("A move constructed connection") {
-        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
         sqlixx::connection conn1{dummy_db_handle};
         sqlixx::connection conn2{std::move(conn1)};
@@ -125,7 +125,7 @@ TEST_CASE("Lifetime management of a connection", "[connection][handle]") {
     }
 
     SECTION("A move assigned connection") {
-        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
         sqlixx::connection conn1{dummy_db_handle};
         sqlixx::connection conn2;
@@ -140,7 +140,7 @@ TEST_CASE("Lifetime management of a connection", "[connection][handle]") {
     }
 
     SECTION("A self-move assigned connection") {
-        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
         sqlixx::connection conn{dummy_db_handle};
 
@@ -161,12 +161,12 @@ TEST_CASE("Lifetime management of a connection", "[connection][handle]") {
     }
 }
 
-TEST_CASE("conversion management of a connection", "[connection][handle]") {
+TEST_CASE("Conversion management of a connection", "[connection][handle]") {
     sqlite_mock mock;
     auto* dummy_db_handle = reinterpret_cast<::sqlite3*>(0xBAAD5EED);
 
     SECTION("Implicit conversion to connection_handle") {
-        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(0);
+        REQUIRE_CALL(mock, sqlite3_close_v2(dummy_db_handle)).RETURN(SQLITE_OK);
 
         sqlixx::connection conn{dummy_db_handle};
         sqlixx::connection_handle conn_handle = conn;

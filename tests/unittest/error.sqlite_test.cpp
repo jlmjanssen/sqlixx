@@ -85,10 +85,13 @@ TEST_CASE("Error handling with sqlite error codes", "[error]") {
         const auto [result_code, condition_value] =
             GENERATE(table<int, sqlixx::sqlite_errc>({{SQLITE_ERROR, sqlixx::sqlite_errc::error},
                                                       {SQLITE_ERROR_RETRY, sqlixx::sqlite_errc::error},
+                                                      {SQLITE_ERROR_RETRY, sqlixx::sqlite_errc::error_retry},
                                                       {SQLITE_BUSY, sqlixx::sqlite_errc::busy},
                                                       {SQLITE_BUSY_TIMEOUT, sqlixx::sqlite_errc::busy},
+                                                      {SQLITE_BUSY_TIMEOUT, sqlixx::sqlite_errc::busy_timeout},
                                                       {SQLITE_IOERR, sqlixx::sqlite_errc::ioerr},
                                                       {SQLITE_IOERR_WRITE, sqlixx::sqlite_errc::ioerr},
+                                                      {SQLITE_IOERR_WRITE, sqlixx::sqlite_errc::ioerr_write},
                                                       {SQLITE_ROW, static_cast<sqlixx::sqlite_errc>(SQLITE_ROW)},
                                                       {SQLITE_DONE, static_cast<sqlixx::sqlite_errc>(SQLITE_DONE)}}));
 
