@@ -8,13 +8,15 @@ module;
 export module sqlixx:statement.bind;
 
 import std;
+import :concepts;
+import :binder_context;
 import :binders;
 import :statement;
 
 namespace sqlixx {
 
 export template <typename... Ts>
-[[nodiscard]] auto bind(binder_context& ctxt, Ts&&... values) noexcept -> std::expected<void, std::error_code> {
+[[nodiscard]] auto bind(binder_context auto& ctxt, Ts&&... values) noexcept -> std::expected<void, std::error_code> {
     std::expected<void, std::error_code> result{};
     std::ignore = ((result = binder_t<Ts>{}(ctxt, std::forward<Ts>(values))) && ...);
     return result;
@@ -23,7 +25,7 @@ export template <typename... Ts>
 export template <typename... Ts>
 [[nodiscard]] auto bind(statement_handle stmt, int index, Ts&&... values) noexcept
     -> std::expected<void, std::error_code> {
-    binder_context ctxt{stmt.get()};
+    checked_binder_context ctxt{stmt.get()};
     auto result = ctxt.set_index(index);
     if (!result) {
         return result;

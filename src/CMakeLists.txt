@@ -7,6 +7,7 @@ target_sources(
         FILE_SET CXX_MODULES
             FILES
                 sqlixx.cppm
+                concepts.cppm
                 error.cppm
                 error.sqlite.cppm
                 handles.cppm

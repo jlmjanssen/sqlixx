@@ -8,12 +8,14 @@ module;
 export module sqlixx:binder_context;
 
 import std;
+import :concepts;
 import :error.sqlite;
 import :index;
 
 namespace sqlixx {
 
-template <typename IndexProvider>
+template <typename IndexProvider, typename Index>
+    requires index_provider<IndexProvider, Index>
 struct basic_binder_context {
     enum class copy : bool { deep, shallow };
 
@@ -25,7 +27,7 @@ struct basic_binder_context {
         return index_.set(index);
     }
 
-    [[nodiscard]] constexpr auto get_and_advance_index() noexcept -> std::expected<int, std::error_code> {
+    [[nodiscard]] constexpr auto get_and_advance_index() noexcept -> std::expected<Index, std::error_code> {
         return index_.get_and_advance();
     }
 
@@ -40,7 +42,9 @@ struct basic_binder_context {
         }
     }
 
-    [[nodiscard]] auto get_destructor() noexcept -> ::sqlite3_destructor_type { return destructor_; }
+    [[nodiscard]] auto get_destructor() const noexcept -> ::sqlite3_destructor_type { return destructor_; }
+
+    [[nodiscard]] constexpr auto to_expected(int result_code) const noexcept -> std::expected<void, std::error_code>;
 
 private:
     ::sqlite3_stmt* handle_;
@@ -49,18 +53,33 @@ private:
 };
 
 template <>
-basic_binder_context<checked_index<int>>::basic_binder_context(::sqlite3_stmt* handle) noexcept
+basic_binder_context<checked_index<int>, int>::basic_binder_context(::sqlite3_stmt* handle) noexcept
     : handle_(handle), index_(1, ::sqlite3_bind_parameter_count(handle) + 1) {
     set_strategy(copy::deep);
 }
 
 template <>
-basic_binder_context<unchecked_index<int>>::basic_binder_context(::sqlite3_stmt* handle) noexcept
+[[nodiscard]] constexpr auto basic_binder_context<checked_index<int>, int>::to_expected(int result_code) const noexcept
+    -> std::expected<void, std::error_code> {
+    if (result_code != SQLITE_OK) [[unlikely]] {
+        return std::unexpected(make_sqlite_error_code(result_code));
+    }
+    return {};
+}
+
+template <>
+basic_binder_context<unchecked_index<int>, int>::basic_binder_context(::sqlite3_stmt* handle) noexcept
     : handle_(handle), index_(1) {
     set_strategy(copy::deep);
 }
 
-export using binder_context = basic_binder_context<checked_index<int>>;
-export using unchecked_binder_context = basic_binder_context<unchecked_index<int>>;
+template <>
+[[nodiscard]] constexpr auto basic_binder_context<unchecked_index<int>, int>::to_expected(int) const noexcept
+    -> std::expected<void, std::error_code> {
+    return {};
+}
+
+export using checked_binder_context = basic_binder_context<checked_index<int>, int>;
+export using unchecked_binder_context = basic_binder_context<unchecked_index<int>, int>;
 
 } // namespace sqlixx

@@ -31,7 +31,7 @@ TEST_CASE("Calling binders explicitly", "binders") {
     SECTION("Binding a single parameter") {
         REQUIRE_CALL(mock, sqlite3_bind_parameter_count(dummy_stmt_handle)).RETURN(1);
 
-        sqlixx::binder_context ctxt{stmt.get()};
+        sqlixx::checked_binder_context ctxt{stmt.get()};
 
         SECTION("Binding a bool") {
             const bool value = true;
@@ -186,7 +186,7 @@ TEST_CASE("Calling binders explicitly", "binders") {
     SECTION("Binding multiple parameters via tuple") {
         REQUIRE_CALL(mock, sqlite3_bind_parameter_count(dummy_stmt_handle)).RETURN(2);
 
-        sqlixx::binder_context ctxt{stmt.get()};
+        sqlixx::checked_binder_context ctxt{stmt.get()};
         const std::tuple value{42, 3.14};
 
         REQUIRE_CALL(mock, sqlite3_bind_int(dummy_stmt_handle, 1, 42)).RETURN(SQLITE_OK);
@@ -198,7 +198,7 @@ TEST_CASE("Calling binders explicitly", "binders") {
     SECTION("Short-circuit error handling") {
         REQUIRE_CALL(mock, sqlite3_bind_parameter_count(dummy_stmt_handle)).RETURN(2);
 
-        sqlixx::binder_context ctxt{stmt.get()};
+        sqlixx::checked_binder_context ctxt{stmt.get()};
         const std::tuple value{42, 3.14};
 
         REQUIRE_CALL(mock, sqlite3_bind_int(dummy_stmt_handle, 1, 42)).RETURN(SQLITE_MISUSE);

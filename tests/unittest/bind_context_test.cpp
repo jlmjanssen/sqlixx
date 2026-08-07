@@ -17,7 +17,7 @@ TEST_CASE("Management of a binder context", "binders") {
 
     REQUIRE_CALL(mock, sqlite3_bind_parameter_count(dummy_stmt_handle)).RETURN(3);
 
-    sqlixx::binder_context ctxt{dummy_stmt_handle};
+    sqlixx::checked_binder_context ctxt{dummy_stmt_handle};
 
     SECTION("The statement handle is copied") {
         CHECK(ctxt.get() == dummy_stmt_handle);
@@ -28,7 +28,7 @@ TEST_CASE("Management of a binder context", "binders") {
     }
 
     SECTION("Set the strategy to shallow") {
-        ctxt.set_strategy(sqlixx::binder_context::copy::shallow);
+        ctxt.set_strategy(sqlixx::checked_binder_context::copy::shallow);
 
         CHECK(ctxt.get_destructor() == SQLITE_STATIC);
     }

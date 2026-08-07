@@ -3,6 +3,7 @@
 
 export module sqlixx;
 
+export import :concepts;
 export import :error;
 export import :error.sqlite;
 export import :handles;

@@ -8,12 +8,6 @@ import :error;
 
 namespace sqlixx {
 
-template <typename Provider, typename Index>
-concept index_provider = requires(Provider provider, Index idx) {
-    { provider.set(idx) } -> std::convertible_to<std::expected<void, std::error_code>>;
-    { provider.get_and_advance() } -> std::convertible_to<std::expected<Index, std::error_code>>;
-};
-
 template <typename Index = int>
 struct checked_index {
     constexpr checked_index(Index begin, Index end) noexcept : begin_(begin), end_(end), current_(begin) {}
