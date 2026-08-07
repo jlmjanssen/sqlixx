@@ -74,7 +74,8 @@ basic_binder_context<unchecked_index<int>, int>::basic_binder_context(::sqlite3_
 }
 
 template <>
-[[nodiscard]] constexpr auto basic_binder_context<unchecked_index<int>, int>::to_expected(int) const noexcept
+[[nodiscard]] constexpr auto
+basic_binder_context<unchecked_index<int>, int>::to_expected([[maybe_unused]] int result_code) const noexcept
     -> std::expected<void, std::error_code> {
     return {};
 }
