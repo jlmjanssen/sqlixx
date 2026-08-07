@@ -194,4 +194,19 @@ TEST_CASE("Calling binders explicitly", "binders") {
 
         CHECK(sqlixx::binder_t<decltype(value)>{}(ctxt, value));
     }
+
+    SECTION("Short-circuit error handling") {
+        REQUIRE_CALL(mock, sqlite3_bind_parameter_count(dummy_stmt_handle)).RETURN(2);
+
+        sqlixx::binder_context ctxt{stmt.get()};
+        const std::tuple value{42, 3.14};
+
+        REQUIRE_CALL(mock, sqlite3_bind_int(dummy_stmt_handle, 1, 42)).RETURN(SQLITE_MISUSE);
+        FORBID_CALL(mock, sqlite3_bind_double(_, _, _));
+
+        auto result = sqlixx::binder_t<decltype(value)>{}(ctxt, value);
+
+        CHECK_FALSE(result);
+        CHECK(result.error() == sqlixx::sqlite_errc::misuse);
+    }
 }
