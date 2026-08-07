@@ -40,51 +40,51 @@ TEST_CASE("Management of a binder context", "binders") {
     }
 
     SECTION("Get and advance the parameter index") {
-        auto index = ctxt.get_and_advance_parameter_index();
+        auto index = ctxt.get_and_advance_index();
 
         CHECK(index);
         CHECK(*index == 1);
 
-        index = ctxt.get_and_advance_parameter_index();
+        index = ctxt.get_and_advance_index();
 
         CHECK(index);
         CHECK(*index == 2);
     }
 
     SECTION("Set the parameter index") {
-        auto index = ctxt.get_and_advance_parameter_index();
+        auto index = ctxt.get_and_advance_index();
 
         CHECK(index);
         CHECK(*index == 1);
 
-        CHECK(ctxt.set_parameter_index(1));
+        CHECK(ctxt.set_index(1));
 
-        index = ctxt.get_and_advance_parameter_index();
+        index = ctxt.get_and_advance_index();
 
         CHECK(index);
         CHECK(*index == 1);
     }
 
     SECTION("Underflow the parameter index") {
-        auto result = ctxt.set_parameter_index(0);
+        auto result = ctxt.set_index(0);
 
         CHECK_FALSE(result);
         CHECK(result.error() == sqlixx::errc::invalid_index);
     }
 
     SECTION("Overflow the parameter index") {
-        auto result = ctxt.set_parameter_index(5);
+        auto result = ctxt.set_index(5);
 
         CHECK_FALSE(result);
         CHECK(result.error() == sqlixx::errc::invalid_index);
     }
 
     SECTION("Overrun the parameter index") {
-        auto result = ctxt.set_parameter_index(4);
+        auto result = ctxt.set_index(4);
 
         CHECK(result);
 
-        auto index = ctxt.get_and_advance_parameter_index();
+        auto index = ctxt.get_and_advance_index();
 
         CHECK_FALSE(index);
         CHECK(index.error() == sqlixx::errc::invalid_index);

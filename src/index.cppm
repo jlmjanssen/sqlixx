@@ -8,9 +8,18 @@ import :error;
 
 namespace sqlixx {
 
+template <typename Provider, typename Index>
+concept index_provider = requires(Provider provider, Index idx) {
+    { Provider::is_checked } -> std::convertible_to<bool>;
+    { provider.set(idx) } -> std::convertible_to<std::expected<void, std::error_code>>;
+    { provider.get_and_advance() } -> std::convertible_to<std::expected<Index, std::error_code>>;
+};
+
 template <typename Index = int>
-struct index_provider {
-    index_provider(Index begin, Index end) noexcept : begin_(begin), end_(end), current_(begin) {}
+struct checked_index {
+    static constexpr bool is_checked = true;
+
+    constexpr checked_index(Index begin, Index end) noexcept : begin_(begin), end_(end), current_(begin) {}
 
     [[nodiscard]] constexpr auto set(Index index) noexcept -> std::expected<void, std::error_code> {
         if (index < begin_ || index > end_) [[unlikely]] {
@@ -32,6 +41,25 @@ struct index_provider {
 private:
     Index begin_;
     Index end_;
+    Index current_;
+};
+
+template <typename Index = int>
+struct unchecked_index {
+    static constexpr bool is_checked = false;
+
+    constexpr explicit unchecked_index(Index begin) noexcept : current_(begin) {}
+
+    [[nodiscard]] constexpr auto set(Index index) noexcept -> std::expected<void, std::error_code> {
+        current_ = index;
+        return {};
+    }
+
+    [[nodiscard]] constexpr auto get_and_advance() noexcept -> std::expected<Index, std::error_code> {
+        return current_++;
+    }
+
+private:
     Index current_;
 };
 

@@ -38,7 +38,7 @@ template <bindable_integer T>
 struct binder<T> {
     [[nodiscard]] auto operator()(binder_context& ctxt, T value) const noexcept
         -> std::expected<void, std::error_code> {
-        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+        return ctxt.get_and_advance_index().and_then([&ctxt, value](int idx) noexcept -> auto {
             if constexpr ((sizeof(T) < sizeof(int)) || ((sizeof(T) == sizeof(int)) && std::is_signed_v<T>)) {
                 return to_expected(::sqlite3_bind_int(ctxt.get(), idx, static_cast<int>(value)));
             } else {
@@ -75,7 +75,7 @@ template <bindable_real T>
 struct binder<T> {
     [[nodiscard]] auto operator()(binder_context& ctxt, T value) const noexcept
         -> std::expected<void, std::error_code> {
-        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+        return ctxt.get_and_advance_index().and_then([&ctxt, value](int idx) noexcept -> auto {
             return to_expected(::sqlite3_bind_double(ctxt.get(), idx, static_cast<double>(value)));
         });
     }
@@ -90,7 +90,7 @@ template <>
 struct binder<std::nullptr_t> {
     [[nodiscard]] auto operator()(binder_context& ctxt, std::nullptr_t) const noexcept
         -> std::expected<void, std::error_code> {
-        return ctxt.get_and_advance_parameter_index().and_then(
+        return ctxt.get_and_advance_index().and_then(
             [&ctxt](int idx) noexcept -> auto { return to_expected(::sqlite3_bind_null(ctxt.get(), idx)); });
     }
 };
@@ -104,7 +104,7 @@ template <typename Char>
 struct binder_cstring {
     auto operator()(binder_context& ctxt, const Char* value, int size = -1) const noexcept
         -> std::expected<void, std::error_code> {
-        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value, size](int idx) noexcept -> auto {
+        return ctxt.get_and_advance_index().and_then([&ctxt, value, size](int idx) noexcept -> auto {
             // NOLINTNEXTLINE(cppcoreguidelines-*)
             const auto* cstr = reinterpret_cast<const char*>(value);
             return to_expected(sqlite3_bind_text(ctxt.get(), idx, cstr, size, ctxt.get_destructor()));
@@ -163,7 +163,7 @@ template <typename T, std::size_t Extent>
 struct binder<std::span<T, Extent>> {
     [[nodiscard]] auto operator()(binder_context& ctxt, std::span<T, Extent> value) const noexcept
         -> std::expected<void, std::error_code> {
-        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+        return ctxt.get_and_advance_index().and_then([&ctxt, value](int idx) noexcept -> auto {
             return to_expected(::sqlite3_bind_blob64(
                 ctxt.get(), idx, static_cast<const void*>(value.data()), value.size_bytes(), ctxt.get_destructor()));
         });
@@ -184,7 +184,7 @@ template <>
 struct binder<zeroblob> {
     [[nodiscard]] auto operator()(binder_context& ctxt, zeroblob value) const noexcept
         -> std::expected<void, std::error_code> {
-        return ctxt.get_and_advance_parameter_index().and_then([&ctxt, value](int idx) noexcept -> auto {
+        return ctxt.get_and_advance_index().and_then([&ctxt, value](int idx) noexcept -> auto {
             return to_expected(::sqlite3_bind_zeroblob64(ctxt.get(), idx, value.size));
         });
     }

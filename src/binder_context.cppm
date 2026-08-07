@@ -17,19 +17,18 @@ export struct binder_context {
     enum class copy : bool { deep, shallow };
 
     explicit binder_context(::sqlite3_stmt* handle) noexcept
-        : handle_(handle), parameter_index_(1, ::sqlite3_bind_parameter_count(handle) + 1) {
+        : handle_(handle), index_(1, ::sqlite3_bind_parameter_count(handle) + 1) {
         set_strategy(copy::deep);
     }
 
     [[nodiscard]] constexpr auto get() const noexcept -> ::sqlite3_stmt* { return handle_; }
 
-    [[nodiscard]] constexpr auto set_parameter_index(int parameter_index) noexcept
-        -> std::expected<void, std::error_code> {
-        return parameter_index_.set(parameter_index);
+    [[nodiscard]] constexpr auto set_index(int index) noexcept -> std::expected<void, std::error_code> {
+        return index_.set(index);
     }
 
-    [[nodiscard]] constexpr auto get_and_advance_parameter_index() noexcept -> std::expected<int, std::error_code> {
-        return parameter_index_.get_and_advance();
+    [[nodiscard]] constexpr auto get_and_advance_index() noexcept -> std::expected<int, std::error_code> {
+        return index_.get_and_advance();
     }
 
     auto set_destructor(::sqlite3_destructor_type destructor) noexcept -> void { destructor_ = destructor; }
@@ -47,7 +46,7 @@ export struct binder_context {
 
 private:
     ::sqlite3_stmt* handle_;
-    index_provider<int> parameter_index_;
+    checked_index<int> index_;
     ::sqlite3_destructor_type destructor_ = nullptr;
 };
 

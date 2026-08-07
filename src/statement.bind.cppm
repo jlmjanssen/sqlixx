@@ -24,7 +24,7 @@ export template <typename... Ts>
 [[nodiscard]] auto bind(statement_handle stmt, int index, Ts&&... values) noexcept
     -> std::expected<void, std::error_code> {
     binder_context ctxt{stmt.get()};
-    auto result = ctxt.set_parameter_index(index);
+    auto result = ctxt.set_index(index);
     if (!result) {
         return result;
     }

@@ -28,7 +28,7 @@ export struct reader_context {
 
 private:
     ::sqlite3_stmt* handle_;
-    index_provider<int> column_index_;
+    checked_index<int> column_index_;
 };
 
 template <typename T>
