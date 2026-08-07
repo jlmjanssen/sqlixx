@@ -10,15 +10,12 @@ namespace sqlixx {
 
 template <typename Provider, typename Index>
 concept index_provider = requires(Provider provider, Index idx) {
-    { Provider::is_checked } -> std::convertible_to<bool>;
     { provider.set(idx) } -> std::convertible_to<std::expected<void, std::error_code>>;
     { provider.get_and_advance() } -> std::convertible_to<std::expected<Index, std::error_code>>;
 };
 
 template <typename Index = int>
 struct checked_index {
-    static constexpr bool is_checked = true;
-
     constexpr checked_index(Index begin, Index end) noexcept : begin_(begin), end_(end), current_(begin) {}
 
     [[nodiscard]] constexpr auto set(Index index) noexcept -> std::expected<void, std::error_code> {
@@ -46,8 +43,6 @@ private:
 
 template <typename Index = int>
 struct unchecked_index {
-    static constexpr bool is_checked = false;
-
     constexpr explicit unchecked_index(Index begin) noexcept : current_(begin) {}
 
     [[nodiscard]] constexpr auto set(Index index) noexcept -> std::expected<void, std::error_code> {

@@ -13,13 +13,11 @@ import :index;
 
 namespace sqlixx {
 
-export struct binder_context {
+template <typename IndexProvider>
+struct basic_binder_context {
     enum class copy : bool { deep, shallow };
 
-    explicit binder_context(::sqlite3_stmt* handle) noexcept
-        : handle_(handle), index_(1, ::sqlite3_bind_parameter_count(handle) + 1) {
-        set_strategy(copy::deep);
-    }
+    explicit basic_binder_context(::sqlite3_stmt* handle) noexcept;
 
     [[nodiscard]] constexpr auto get() const noexcept -> ::sqlite3_stmt* { return handle_; }
 
@@ -46,8 +44,23 @@ export struct binder_context {
 
 private:
     ::sqlite3_stmt* handle_;
-    checked_index<int> index_;
+    IndexProvider index_;
     ::sqlite3_destructor_type destructor_ = nullptr;
 };
+
+template <>
+basic_binder_context<checked_index<int>>::basic_binder_context(::sqlite3_stmt* handle) noexcept
+    : handle_(handle), index_(1, ::sqlite3_bind_parameter_count(handle) + 1) {
+    set_strategy(copy::deep);
+}
+
+template <>
+basic_binder_context<unchecked_index<int>>::basic_binder_context(::sqlite3_stmt* handle) noexcept
+    : handle_(handle), index_(1) {
+    set_strategy(copy::deep);
+}
+
+export using binder_context = basic_binder_context<checked_index<int>>;
+export using unchecked_binder_context = basic_binder_context<unchecked_index<int>>;
 
 } // namespace sqlixx
